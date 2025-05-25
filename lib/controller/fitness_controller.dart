@@ -1,13 +1,13 @@
+import 'package:app_fitness/controller/auth_controller.dart';
+import 'package:app_fitness/controller/user_profile_controller.dart';
 import 'package:app_fitness/core/service/fitness_ai_service.dart';
+import 'package:app_fitness/data/repositories/recipe_repository.dart';
 import 'package:app_fitness/model/recipe_model.dart';
 import 'package:app_fitness/model/user_profile_model.dart';
 import 'package:app_fitness/model/workout_routine_model.dart';
 import 'package:get/get.dart';
 import 'dart:convert';
 import 'package:app_fitness/data/repositories/workout_repository.dart';
-import 'package:app_fitness/data/repositories/recipe_repository.dart';
-import 'package:app_fitness/controller/user_profile_controller.dart'; // Ajustado
-import 'package:app_fitness/controller/auth_controller.dart'; // Ajustado
 
 class FitnessController extends GetxController {
   final FitnessAiService _aiService = Get.find<FitnessAiService>();

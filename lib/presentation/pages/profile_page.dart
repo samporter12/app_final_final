@@ -1,6 +1,8 @@
-import 'package:app_fitness/controller/user_profile_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:app_fitness/controller/user_profile_controller.dart';
+import 'package:app_fitness/controller/auth_controller.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -10,16 +12,17 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final UserProfileController _profileController = Get.find();
+  final UserProfileController _profileController =
+      Get.find<UserProfileController>();
+  final AuthController _authController =
+      Get.find<AuthController>(); // Para el nombre por defecto
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   // Controladores para los campos del formulario
-  final TextEditingController _goalController = TextEditingController();
-  final TextEditingController _fitnessLevelController = TextEditingController();
-  // Agrega más controladores si tienes más campos:
-  // final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _weightController = TextEditingController();
 
-  // Lista de opciones para los desplegables
   final List<String> _goalOptions = ['muscle_gain', 'deficit', 'maintenance'];
   final List<String> _fitnessLevelOptions = [
     'beginner',
@@ -33,29 +36,41 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    // Carga el perfil al iniciar la página si aún no se ha cargado
-    if (_profileController.userProfile.value == null &&
-        !_profileController.isLoadingProfile.value) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _profileController.loadUserProfile().then((_) {
-          _populateFormFields();
-        });
-      });
-    } else {
+    // Usar addPostFrameCallback para asegurar que el UserProfileController
+    // haya tenido la oportunidad de cargar el perfil si es necesario.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _populateFormFields();
-    }
+    });
   }
 
   void _populateFormFields() {
     final profile = _profileController.userProfile.value;
     if (profile != null) {
-      _selectedGoal = _goalOptions.contains(profile.goal) ? profile.goal : null;
-      _selectedFitnessLevel =
-          _fitnessLevelOptions.contains(profile.fitnessLevel)
-              ? profile.fitnessLevel
-              : null;
-      // _weightController.text = profile.weight?.toString() ?? '';
-      setState(() {}); // Para actualizar los DropdownButton
+      _nameController.text = profile.name;
+      _ageController.text = profile.age?.toString() ?? '';
+      _weightController.text = profile.weight?.toString() ?? '';
+
+      // Manejar valores iniciales para Dropdowns
+      if (profile.goal.isNotEmpty && _goalOptions.contains(profile.goal)) {
+        _selectedGoal = profile.goal;
+      } else if (_goalOptions.isNotEmpty) {
+        // _selectedGoal = _goalOptions.first; // Opcional: seleccionar el primero por defecto
+      }
+
+      if (profile.fitnessLevel.isNotEmpty &&
+          _fitnessLevelOptions.contains(profile.fitnessLevel)) {
+        _selectedFitnessLevel = profile.fitnessLevel;
+      } else if (_fitnessLevelOptions.isNotEmpty) {
+        // _selectedFitnessLevel = _fitnessLevelOptions.first; // Opcional
+      }
+      // Es importante llamar a setState si los valores de los Dropdown cambian aquí
+      // para que la UI refleje la selección.
+      if (mounted) {
+        setState(() {});
+      }
+    } else {
+      // Si no hay perfil (ej. primer registro), tomar el nombre del AuthController si está disponible
+      _nameController.text = _authController.currentUser.value?.name ?? '';
     }
   }
 
@@ -63,69 +78,187 @@ class _ProfilePageState extends State<ProfilePage> {
     if (_formKey.currentState!.validate()) {
       if (_selectedGoal == null || _selectedFitnessLevel == null) {
         Get.snackbar(
-          "Campos incompletos",
-          "Por favor selecciona objetivo y nivel.",
+          "Campos Incompletos",
+          "Por favor, selecciona tu objetivo y nivel de fitness.",
           snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orangeAccent,
         );
         return;
       }
       _profileController.saveOrUpdateProfile(
+        name: _nameController.text.trim(),
+        age:
+            _ageController.text.isNotEmpty
+                ? int.tryParse(_ageController.text.trim())
+                : null,
+        weight:
+            _weightController.text.isNotEmpty
+                ? double.tryParse(
+                  _weightController.text.trim().replaceAll(',', '.'),
+                )
+                : null, // Reemplazar coma por punto para parseo
         goal: _selectedGoal!,
         fitnessLevel: _selectedFitnessLevel!,
-        // weight: _weightController.text.isNotEmpty ? double.tryParse(_weightController.text) : null,
       );
     }
   }
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    _ageController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Escuchar cambios en userProfile para repopular campos si se carga después
+    // Esto es útil si se navega a esta página y loadUserProfile aún no ha terminado
+    // o si es la primera vez y UserProfileController crea un perfil por defecto.
+    ever(_profileController.userProfile, (_) => _populateFormFields());
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Mi Perfil Fitness')),
+      appBar: AppBar(
+        title: Obx(
+          () => Text(
+            _profileController.userProfile.value?.id != null &&
+                    _profileController.userProfile.value!.id!.isNotEmpty
+                ? 'Actualizar Perfil'
+                : 'Crear Perfil Fitness',
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: Obx(() {
+        // Usar Obx para reaccionar a isLoadingProfile
         if (_profileController.isLoadingProfile.value &&
             _profileController.userProfile.value == null) {
+          // Muestra loading solo si está cargando y aún no hay datos de perfil (primera carga)
           return const Center(child: CircularProgressIndicator());
         }
-        // Si hay un error y no es 'perfil no encontrado', muéstralo
+
+        // Si hubo un error al cargar el perfil, mostrarlo
         if (_profileController.profileError.value.isNotEmpty &&
-            !_profileController.profileError.value.contains("encontrado") &&
             _profileController.userProfile.value == null) {
           return Center(
-            child: Text('Error: ${_profileController.profileError.value}'),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Error al cargar tu perfil:\n${_profileController.profileError.value}",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.refresh),
+                    label: const Text("Reintentar Cargar"),
+                    onPressed: () => _profileController.loadUserProfile(),
+                  ),
+                ],
+              ),
+            ),
           );
         }
 
-        // Aunque haya un error de "perfil no encontrado", igual mostramos el formulario
-        // para que el usuario pueda crear su perfil.
-        // _populateFormFields(); // Llama aquí si no se usa en initState o si puede cambiar
-
+        // Aunque el perfil se esté cargando en segundo plano (actualización),
+        // o si es la primera vez (userProfile.value podría tener valores por defecto),
+        // mostramos el formulario. _populateFormFields se encarga de llenar los controladores.
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const Text(
-                  'Tu Objetivo:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Por favor ingresa tu nombre';
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 20),
+
+                TextFormField(
+                  controller: _ageController,
+                  decoration: const InputDecoration(
+                    labelText: 'Edad',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.cake_outlined),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      final age = int.tryParse(value.trim());
+                      if (age == null || age <= 0 || age > 120) {
+                        return 'Ingresa una edad válida';
+                      }
+                    }
+                    return null; // Edad es opcional
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                TextFormField(
+                  controller: _weightController,
+                  decoration: const InputDecoration(
+                    labelText: 'Peso (kg)',
+                    hintText: 'Ej: 70.5',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.monitor_weight_outlined),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*([.,])?\d{0,1}$'),
+                    ), // Permite números con un decimal
+                  ],
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      final weight = double.tryParse(
+                        value.trim().replaceAll(',', '.'),
+                      );
+                      if (weight == null || weight <= 0 || weight > 500) {
+                        return 'Ingresa un peso válido';
+                      }
+                    }
+                    return null; // Peso es opcional
+                  },
+                ),
+                const SizedBox(height: 20),
+
                 DropdownButtonFormField<String>(
                   value: _selectedGoal,
                   decoration: const InputDecoration(
+                    labelText: 'Tu Objetivo Principal',
                     border: OutlineInputBorder(),
-                    hintText: 'Selecciona tu objetivo',
+                    prefixIcon: Icon(Icons.flag_outlined),
                   ),
                   items:
                       _goalOptions.map((String value) {
                         return DropdownMenuItem<String>(
                           value: value,
                           child: Text(
-                            GetStringUtils(
-                                  value.replaceAll('_', ' '),
-                                ).capitalizeFirst ??
-                                value,
+                            value.replaceAll('_', ' ').capitalizeFirst ?? value,
                           ),
                         );
                       }).toList(),
@@ -135,20 +268,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     });
                   },
                   validator:
-                      (value) => value == null ? 'Campo requerido' : null,
+                      (value) =>
+                          value == null ? 'Selecciona tu objetivo' : null,
                 ),
                 const SizedBox(height: 20),
 
-                const Text(
-                  'Tu Nivel de Fitness:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _selectedFitnessLevel,
                   decoration: const InputDecoration(
+                    labelText: 'Tu Nivel de Fitness Actual',
                     border: OutlineInputBorder(),
-                    hintText: 'Selecciona tu nivel',
+                    prefixIcon: Icon(Icons.fitness_center_outlined),
                   ),
                   items:
                       _fitnessLevelOptions.map((String value) {
@@ -163,62 +293,54 @@ class _ProfilePageState extends State<ProfilePage> {
                     });
                   },
                   validator:
-                      (value) => value == null ? 'Campo requerido' : null,
+                      (value) => value == null ? 'Selecciona tu nivel' : null,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 30),
 
-                // Ejemplo de campo de texto para peso:
-                // const Text('Tu Peso (kg):', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                // const SizedBox(height: 8),
-                // TextFormField(
-                //   controller: _weightController,
-                //   decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'Ej: 70.5'),
-                //   keyboardType: TextInputType.numberWithOptions(decimal: true),
-                //   validator: (value) {
-                //     if (value != null && value.isNotEmpty && double.tryParse(value) == null) {
-                //       return 'Ingresa un número válido';
-                //     }
-                //     return null;
-                //   },
-                // ),
-                // const SizedBox(height: 30),
-                Center(
-                  child: Obx(() {
-                    if (_profileController.isLoadingProfile.value &&
-                        _profileController.userProfile.value != null) {
-                      // Muestra loading si está actualizando
-                      return const CircularProgressIndicator();
-                    }
-                    return ElevatedButton(
-                      onPressed: _submitProfile,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 50,
-                          vertical: 15,
-                        ),
-                        textStyle: const TextStyle(fontSize: 16),
-                      ),
-                      child: Text(
-                        _profileController.userProfile.value != null
-                            ? 'Actualizar Perfil'
-                            : 'Guardar Perfil',
-                      ),
-                    );
-                  }),
+                ElevatedButton.icon(
+                  icon: Obx(
+                    () =>
+                        _profileController.isLoadingProfile.value
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : const Icon(Icons.save_alt_outlined),
+                  ),
+                  label: Text(
+                    _profileController.userProfile.value?.id != null &&
+                            _profileController.userProfile.value!.id!.isNotEmpty
+                        ? 'Actualizar Perfil'
+                        : 'Guardar y Continuar',
+                  ),
+                  onPressed:
+                      _profileController.isLoadingProfile.value
+                          ? null
+                          : _submitProfile,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Obx(() {
+                  // Para mostrar errores del proceso de guardado
                   if (_profileController.profileError.value.isNotEmpty &&
-                      !_profileController.profileError.value.contains(
-                        "encontrado",
-                      )) {
+                      !_profileController.isLoadingProfile.value) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 10.0),
                       child: Center(
                         child: Text(
-                          _profileController.profileError.value,
+                          "Error al guardar: ${_profileController.profileError.value}",
                           style: const TextStyle(
-                            color: Colors.red,
+                            color: Colors.redAccent,
                             fontSize: 14,
                           ),
                           textAlign: TextAlign.center,

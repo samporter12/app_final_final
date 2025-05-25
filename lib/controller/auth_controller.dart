@@ -1,12 +1,13 @@
 // lib/controller/auth_controller.dart
 import 'package:app_fitness/controller/fitness_controller.dart';
 import 'package:appwrite/models.dart' as AppwriteModels;
+import 'package:flutter/material.dart'; // Importado para FocusManager
 import 'package:get/get.dart';
 import 'package:app_fitness/data/repositories/auth_repository.dart';
 import 'package:app_fitness/presentation/pages/home_page.dart';
 import 'package:app_fitness/presentation/pages/login_page.dart';
-import 'package:app_fitness/presentation/pages/profile_page.dart'; // Necesario para la redirección
-import 'package:app_fitness/controller/user_profile_controller.dart'; // Necesario para verificar perfil
+import 'package:app_fitness/presentation/pages/profile_page.dart';
+import 'package:app_fitness/controller/user_profile_controller.dart';
 
 class AuthController extends GetxController {
   final AuthRepository _authRepository;
@@ -20,7 +21,7 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initializeUser(); // Carga el usuario al iniciar el controlador
+    _initializeUser();
   }
 
   Future<void> _initializeUser() async {
@@ -39,15 +40,18 @@ class AuthController extends GetxController {
   Future<void> _handleRequest(
     Future<void> Function() requestFunction, {
     Function? onSuccess,
-    Function?
-    onError, // Callback para manejar errores específicos si es necesario
+    Function? onError,
+    bool updateUserStateAfterSuccess = true,
   }) async {
     try {
       isLoading.value = true;
       error.value = '';
       await requestFunction();
-      // Actualizar el usuario actual después de la operación
-      currentUser.value = await _authRepository.getCurrentUser();
+
+      if (updateUserStateAfterSuccess) {
+        currentUser.value = await _authRepository.getCurrentUser();
+      }
+
       if (onSuccess != null) {
         onSuccess();
       }
@@ -55,6 +59,8 @@ class AuthController extends GetxController {
       error.value = e.toString().replaceFirst("Exception: ", "");
       if (onError != null) {
         onError();
+      } else {
+        print("Error en _handleRequest: ${error.value}");
       }
     } finally {
       isLoading.value = false;
@@ -65,9 +71,6 @@ class AuthController extends GetxController {
     await _handleRequest(
       () async => await _authRepository.login(email: email, password: password),
       onSuccess: () {
-        // Después de un login normal, verificar perfil también podría ser una opción
-        // o simplemente ir a HomePage y que HomePage maneje la lógica del perfil.
-        // Por ahora, mantenemos la redirección a HomePage y HomePage se encarga.
         Get.offAll(() => HomePage());
       },
     );
@@ -76,53 +79,57 @@ class AuthController extends GetxController {
   Future<void> register(String email, String password, String name) async {
     await _handleRequest(
       () async {
-        // 1. Crear la cuenta del usuario
         await _authRepository.createAccount(
           email: email,
           password: password,
           name: name,
         );
-        // 2. Iniciar sesión automáticamente con el usuario recién creado
         await _authRepository.login(email: email, password: password);
       },
       onSuccess: () async {
-        // 3. Después del login exitoso tras el registro:
-        // Asegurarse de que UserProfileController esté disponible
+        print("Registro y login automático exitosos, verificando perfil...");
         if (!Get.isRegistered<UserProfileController>()) {
-          // Esto no debería pasar si main.dart está bien configurado
           Get.snackbar(
             "Error de Configuración",
             "UserProfileController no encontrado.",
             snackPosition: SnackPosition.BOTTOM,
           );
-          Get.offAll(() => LoginPage()); // Fallback seguro
+          Get.offAll(() => LoginPage());
           return;
         }
         final userProfileController = Get.find<UserProfileController>();
-        final userId =
-            getCurrentUserId(); // Obtener el ID del usuario recién logueado
+        final userId = getCurrentUserId();
+        print("UserID para verificar perfil: $userId");
 
         if (userId != null) {
-          // 4. Intentar cargar el perfil del usuario para ver si ya existe (no debería para un nuevo registro)
-          await userProfileController
-              .loadUserProfile(); // Este método usa el userId del AuthController
+          await userProfileController.loadUserProfile();
 
-          // 5. Redirigir basado en la existencia del perfil
-          if (userProfileController.userProfile.value == null) {
-            // Si no hay perfil (userProfile.value es null),
-            // o si hubo un error específico de "perfil no encontrado",
-            // redirigir a ProfilePage para que el usuario lo cree.
+          final profile = userProfileController.userProfile.value;
+          print(
+            "DEBUG AuthController: Perfil obtenido de UserProfileController: ${profile?.toJson()}",
+          );
+          print("DEBUG AuthController: ID del perfil obtenido: ${profile?.id}");
+
+          bool needsProfileCreation = true;
+
+          if (profile != null) {
+            if (profile.id != null && profile.id!.isNotEmpty) {
+              needsProfileCreation = false;
+            }
+          }
+
+          if (needsProfileCreation) {
             print(
-              "Usuario nuevo o perfil no encontrado. Redirigiendo a ProfilePage.",
+              "Usuario nuevo o perfil sin ID de DB válido. Redirigiendo a ProfilePage.",
             );
             Get.offAll(() => ProfilePage());
           } else {
-            // Si el perfil ya existe (caso muy raro para un nuevo registro, pero es un fallback), ir a HomePage.
-            print("Perfil encontrado. Redirigiendo a HomePage.");
+            print(
+              "Perfil encontrado con ID de DB (${profile?.id}). Redirigiendo a HomePage.",
+            );
             Get.offAll(() => HomePage());
           }
         } else {
-          // No se pudo obtener el userId después del login, algo salió mal.
           Get.snackbar(
             "Error de Sesión",
             "No se pudo verificar tu sesión. Por favor, inicia sesión.",
@@ -132,32 +139,58 @@ class AuthController extends GetxController {
         }
       },
       onError: () {
-        // Si el registro o el login automático fallan, el usuario se queda en la página de registro.
-        // El error se mostrará en la UI gracias a `error.value` que se actualiza en _handleRequest.
         print("Error durante el registro o login automático: ${error.value}");
       },
     );
   }
 
   Future<void> logout() async {
-    await _handleRequest(
-      () async => await _authRepository.logout(),
-      onSuccess: () {
-        currentUser.value = null; // Limpiar el usuario actual
-        // Limpiar también el perfil del usuario y datos de fitness
+    isLoading.value = true;
+    error.value = '';
+    try {
+      FocusManager.instance.primaryFocus?.unfocus();
+      await _authRepository.logout();
+
+      currentUser.value = null;
+
+      Get.offAll(() => LoginPage()); // Navegar primero
+
+      // Limpiar otros controladores DESPUÉS de la navegación principal.
+      // Usar addPostFrameCallback para ejecutar después de que el frame actual se complete.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (Get.isRegistered<UserProfileController>()) {
           Get.find<UserProfileController>().clearProfileOnLogout();
         }
         if (Get.isRegistered<FitnessController>()) {
-          // Asumiendo que tienes FitnessController
           Get.find<FitnessController>().clearFitnessDataOnLogout();
         }
+        print(
+          "Controladores de perfil y fitness limpiados post-logout y navegación.",
+        );
+      });
+    } catch (e) {
+      error.value = e.toString().replaceFirst("Exception: ", "");
+      print("Error durante el logout: ${error.value}");
+
+      if (!error.value.toLowerCase().contains("texteditingcontroller") &&
+          !error.value.toLowerCase().contains("missing scope (account)")) {
+        Get.snackbar(
+          "Error de Logout",
+          "No se pudo cerrar la sesión.",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+
+      // Si el error fue capturado y la navegación principal no ocurrió, intentar forzarla.
+      // Asegúrate de que '/login' sea el nombre de tu ruta para LoginPage en getPages.
+      if (Get.currentRoute != '/login') {
         Get.offAll(() => LoginPage());
-      },
-    );
+      }
+    } finally {
+      isLoading.value = false;
+    }
   }
 
-  /// Verifica el estado de autenticación al iniciar la aplicación.
   Future<bool> checkAuthStatusForAppStart() async {
     isLoading.value = true;
     try {
@@ -165,7 +198,10 @@ class AuthController extends GetxController {
       currentUser.value = user;
       return user != null;
     } catch (e) {
-      error.value = e.toString().replaceFirst("Exception: ", "");
+      if (!e.toString().toLowerCase().contains("missing scope (account)")) {
+        error.value = e.toString().replaceFirst("Exception: ", "");
+      }
+      print("checkAuthStatusForAppStart error (puede ser normal): $e");
       currentUser.value = null;
       return false;
     } finally {

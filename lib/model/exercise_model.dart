@@ -1,12 +1,9 @@
-// lib/data/model/exercise_model.dart
-
 class ExerciseModel {
   final String name;
   final int sets;
-  final String
-  reps; // Puede ser un rango como "8-12" o un número como "15" o "Al fallo"
-  final int rest; // en segundos
-  final String? notes; // Opcional
+  final String reps;
+  final int rest;
+  final String? notes;
 
   ExerciseModel({
     required this.name,

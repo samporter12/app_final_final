@@ -127,14 +127,12 @@ class _HomePageState extends State<HomePage> {
             tooltip: "Cerrar Sesión",
             onPressed: () {
               _authController.logout();
-              // _fitnessController.clearFitnessDataOnLogout(); // AuthController ya llama a esto
             },
           ),
         ],
       ),
       body: Obx(() {
         if (_fitnessController.fitnessError.value.isNotEmpty) {
-          // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -181,7 +179,6 @@ class _HomePageState extends State<HomePage> {
         }
 
         if (noDataAvailable && !isLoadingOverall) {
-          // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -224,8 +221,7 @@ class _HomePageState extends State<HomePage> {
         return DefaultTabController(
           length: 2,
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start, // Para alinear el SectionTitle
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 color: theme.colorScheme.surfaceVariant,
@@ -266,7 +262,6 @@ class _HomePageState extends State<HomePage> {
       return const LoadingIndicator(message: "Cargando rutina...");
     }
     if (routine == null || routine.days.isEmpty) {
-      // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),
@@ -278,12 +273,10 @@ class _HomePageState extends State<HomePage> {
       );
     }
     return ListView(
-      // Cambiado a ListView para poder añadir el SectionTitle
       padding: const EdgeInsets.all(8.0),
       children: [
         const SectionTitle(title: "Tu Plan Semanal"),
         ...routine.days.asMap().entries.map((entry) {
-          // Usar asMap para obtener el índice
           int dayIndex = entry.key;
           WorkoutDayModel day = entry.value;
           return WorkoutDayPanel(workoutDay: day, dayIndex: dayIndex);
@@ -297,7 +290,6 @@ class _HomePageState extends State<HomePage> {
       return const LoadingIndicator(message: "Cargando recetas...");
     }
     if (recipes.isEmpty) {
-      // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),
@@ -309,12 +301,10 @@ class _HomePageState extends State<HomePage> {
       );
     }
     return ListView(
-      // Cambiado a ListView para poder añadir el SectionTitle
       padding: const EdgeInsets.all(8.0),
       children: [
         const SectionTitle(title: "Sugerencias de Comidas"),
         ...recipes.asMap().entries.map((entry) {
-          // Usar asMap para obtener el índice
           int recipeIndex = entry.key;
           RecipeModel recipe = entry.value;
           return RecipeCard(recipe: recipe, recipeIndex: recipeIndex);

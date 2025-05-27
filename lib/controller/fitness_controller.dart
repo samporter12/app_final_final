@@ -34,13 +34,6 @@ class FitnessController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Podrías reaccionar a cambios en el perfil para auto-generar si es la primera vez
-    // ever(_userProfileController.userProfile, (UserProfileModel? profile) {
-    //   if (profile != null && currentWorkoutRoutine.value == null && currentRecipes.isEmpty) {
-    //     // Verifica si es realmente la primera vez o si solo se actualizó el perfil
-    //     // generateFullFitnessPlan(); Podría ser muy agresivo aquí.
-    //   }
-    // });
   }
 
   Future<void> generateFullFitnessPlan({bool forceRegenerate = false}) async {
@@ -74,7 +67,7 @@ class FitnessController extends GetxController {
     if (!forceRegenerate && _workoutRepository != null) {
       isLoadingWorkout.value = true;
       try {
-        currentWorkoutRoutine.value = await _workoutRepository!
+        currentWorkoutRoutine.value = await _workoutRepository
             .getWorkoutRoutineForUser(userId);
         if (currentWorkoutRoutine.value != null) routineLoadedFromRepo = true;
       } catch (e) {
@@ -91,7 +84,7 @@ class FitnessController extends GetxController {
     if (!forceRegenerate && _recipeRepository != null) {
       isLoadingRecipes.value = true;
       try {
-        final recipes = await _recipeRepository!.getRecipesForUser(userId);
+        final recipes = await _recipeRepository.getRecipesForUser(userId);
         if (recipes.isNotEmpty) {
           currentRecipes.assignAll(recipes);
           recipesLoadedFromRepo = true;
@@ -138,7 +131,6 @@ class FitnessController extends GetxController {
     String userId,
   ) async {
     isLoadingWorkout.value = true;
-    // No limpiar fitnessError aquí para no sobrescribir un posible error de recetas
     String? previousError =
         fitnessError.value.contains("rutina") ? null : fitnessError.value;
 
@@ -154,14 +146,13 @@ class FitnessController extends GetxController {
       currentWorkoutRoutine.value = newRoutine;
 
       if (_workoutRepository != null) {
-        await _workoutRepository!.saveWorkoutRoutine(
+        await _workoutRepository.saveWorkoutRoutine(
           currentWorkoutRoutine.value!,
           userId,
         );
         print("Rutina guardada en Appwrite.");
       }
-      fitnessError.value =
-          previousError ?? ''; // Limpiar error de rutina si tuvo éxito
+      fitnessError.value = previousError ?? '';
     } catch (e) {
       print("Error en _generateAndSaveWorkoutRoutine: $e");
       final routineError =
@@ -191,7 +182,6 @@ class FitnessController extends GetxController {
       final Map<String, dynamic> recipesJson = jsonDecode(recipesJsonString);
       final recipeListModel = RecipeListModel.fromJson(recipesJson);
 
-      // Asignar userId y generatedAt a cada receta antes de guardarlas en el estado o BBDD
       final processedRecipes =
           recipeListModel.recipes.map((recipe) {
             recipe.userId = userId;
@@ -201,7 +191,7 @@ class FitnessController extends GetxController {
       currentRecipes.assignAll(processedRecipes);
 
       if (_recipeRepository != null && currentRecipes.isNotEmpty) {
-        await _recipeRepository!.saveUserRecipes(
+        await _recipeRepository.saveUserRecipes(
           currentRecipes.toList(),
           userId,
         );

@@ -1,13 +1,11 @@
-// lib/data/model/user_profile_model.dart
-
 class UserProfileModel {
-  String? id; // ID del documento de Appwrite ($id)
-  final String userId; // ID del usuario de Appwrite Auth
-  String name; // Nombre del usuario
-  int? age; // Edad del usuario
-  double? weight; // Peso del usuario en kg (puedes ajustar la unidad)
-  String goal; // Objetivo: "muscle_gain", "deficit", "maintenance"
-  String fitnessLevel; // Nivel: "beginner", "intermediate", "advanced"
+  String? id;
+  final String userId;
+  String name;
+  int? age;
+  double? weight;
+  String goal;
+  String fitnessLevel;
   DateTime? createdAt;
   DateTime? updatedAt;
 
@@ -27,11 +25,9 @@ class UserProfileModel {
     return UserProfileModel(
       id: json['\$id'] as String?,
       userId: json['userId'] as String,
-      name: json['name'] as String? ?? '', // Asegurar que no sea null
+      name: json['name'] as String? ?? '',
       age: json['age'] as int?,
-      weight:
-          (json['weight'] as num?)
-              ?.toDouble(), // Appwrite puede devolver int o double
+      weight: (json['weight'] as num?)?.toDouble(),
       goal: json['goal'] as String,
       fitnessLevel: json['fitnessLevel'] as String,
       createdAt:
@@ -53,7 +49,6 @@ class UserProfileModel {
       'weight': weight,
       'goal': goal,
       'fitnessLevel': fitnessLevel,
-      // createdAt y updatedAt son manejados por Appwrite
     };
   }
 }

@@ -50,8 +50,6 @@ class RecipeModel {
 
   Map<String, dynamic> toJson() {
     return {
-      // 'userId': userId, // Se añade en el repositorio
-      // 'generatedAt': generatedAt?.toIso8601String(), // Se añade en el repositorio
       'name': name,
       'type': type,
       'description': description,
@@ -65,7 +63,6 @@ class RecipeModel {
   }
 }
 
-// Clase contenedora si Gemini devuelve un objeto con una clave "recipes"
 class RecipeListModel {
   final List<RecipeModel> recipes;
 

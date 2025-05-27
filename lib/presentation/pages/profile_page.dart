@@ -14,20 +14,22 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final UserProfileController _profileController =
       Get.find<UserProfileController>();
-  final AuthController _authController =
-      Get.find<AuthController>(); // Para el nombre por defecto
+  final AuthController _authController = Get.find<AuthController>();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  // Controladores para los campos del formulario
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
 
-  final List<String> _goalOptions = ['muscle_gain', 'deficit', 'maintenance'];
+  final List<String> _goalOptions = [
+    'Ganancia Muscular',
+    'Deficit Calorico',
+    'Mantener estado actual',
+  ];
   final List<String> _fitnessLevelOptions = [
-    'beginner',
-    'intermediate',
-    'advanced',
+    'Principiante',
+    'Intermedia',
+    'Avanzado',
   ];
 
   String? _selectedGoal;
@@ -36,8 +38,6 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    // Usar addPostFrameCallback para asegurar que el UserProfileController
-    // haya tenido la oportunidad de cargar el perfil si es necesario.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _populateFormFields();
     });
@@ -50,26 +50,18 @@ class _ProfilePageState extends State<ProfilePage> {
       _ageController.text = profile.age?.toString() ?? '';
       _weightController.text = profile.weight?.toString() ?? '';
 
-      // Manejar valores iniciales para Dropdowns
       if (profile.goal.isNotEmpty && _goalOptions.contains(profile.goal)) {
         _selectedGoal = profile.goal;
-      } else if (_goalOptions.isNotEmpty) {
-        // _selectedGoal = _goalOptions.first; // Opcional: seleccionar el primero por defecto
-      }
+      } else if (_goalOptions.isNotEmpty) {}
 
       if (profile.fitnessLevel.isNotEmpty &&
           _fitnessLevelOptions.contains(profile.fitnessLevel)) {
         _selectedFitnessLevel = profile.fitnessLevel;
-      } else if (_fitnessLevelOptions.isNotEmpty) {
-        // _selectedFitnessLevel = _fitnessLevelOptions.first; // Opcional
-      }
-      // Es importante llamar a setState si los valores de los Dropdown cambian aquí
-      // para que la UI refleje la selección.
+      } else if (_fitnessLevelOptions.isNotEmpty) {}
       if (mounted) {
         setState(() {});
       }
     } else {
-      // Si no hay perfil (ej. primer registro), tomar el nombre del AuthController si está disponible
       _nameController.text = _authController.currentUser.value?.name ?? '';
     }
   }
@@ -96,7 +88,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ? double.tryParse(
                   _weightController.text.trim().replaceAll(',', '.'),
                 )
-                : null, // Reemplazar coma por punto para parseo
+                : null,
         goal: _selectedGoal!,
         fitnessLevel: _selectedFitnessLevel!,
       );
@@ -113,9 +105,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Escuchar cambios en userProfile para repopular campos si se carga después
-    // Esto es útil si se navega a esta página y loadUserProfile aún no ha terminado
-    // o si es la primera vez y UserProfileController crea un perfil por defecto.
     ever(_profileController.userProfile, (_) => _populateFormFields());
 
     return Scaffold(
@@ -131,10 +120,8 @@ class _ProfilePageState extends State<ProfilePage> {
         centerTitle: true,
       ),
       body: Obx(() {
-        // Usar Obx para reaccionar a isLoadingProfile
         if (_profileController.isLoadingProfile.value &&
             _profileController.userProfile.value == null) {
-          // Muestra loading solo si está cargando y aún no hay datos de perfil (primera carga)
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -169,9 +156,6 @@ class _ProfilePageState extends State<ProfilePage> {
           );
         }
 
-        // Aunque el perfil se esté cargando en segundo plano (actualización),
-        // o si es la primera vez (userProfile.value podría tener valores por defecto),
-        // mostramos el formulario. _populateFormFields se encarga de llenar los controladores.
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
           child: Form(
@@ -241,7 +225,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         return 'Ingresa un peso válido';
                       }
                     }
-                    return null; // Peso es opcional
+                    return null;
                   },
                 ),
                 const SizedBox(height: 20),

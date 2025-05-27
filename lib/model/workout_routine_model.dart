@@ -2,9 +2,9 @@ import 'package:app_fitness/model/exercise_model.dart'; // Ajustado a tu estruct
 
 class WorkoutRoutineModel {
   final List<WorkoutDayModel> days;
-  String? id; // Para el ID del documento de Appwrite
-  String? userId; // Para el userId asociado
-  DateTime? createdAt; // Para la fecha de creación
+  String? id;
+  String? userId;
+  DateTime? createdAt;
 
   WorkoutRoutineModel({
     required this.days,
@@ -38,20 +38,7 @@ class WorkoutRoutineModel {
       "Formato JSON inesperado para WorkoutRoutineModel. Contenido: $json",
     );
   }
-
   Map<String, dynamic> toJson() {
-    // Para guardar en Appwrite
-    return {
-      // 'userId': userId, // Se añade en el repositorio antes de guardar
-      // 'createdAt': createdAt?.toIso8601String(), // Se añade en el repositorio
-      'days': days.map((d) => d.toJson()).toList(),
-      // La estructura de Gemini es "workoutPlan": {"days": [...] }
-      // Así que al guardar, podrías querer anidar esto si tu colección de Appwrite lo espera así
-      // o simplemente guardar el contenido de "days". Por simplicidad, guardamos "days".
-      // Si quieres replicar la estructura de Gemini:
-      // 'workoutPlan': {
-      //   'days': days.map((d) => d.toJson()).toList(),
-      // }
-    };
+    return {'days': days.map((d) => d.toJson()).toList()};
   }
 }

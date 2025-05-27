@@ -1,7 +1,6 @@
-// lib/controller/auth_controller.dart
 import 'package:app_fitness/controller/fitness_controller.dart';
 import 'package:appwrite/models.dart' as AppwriteModels;
-import 'package:flutter/material.dart'; // Importado para FocusManager
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_fitness/data/repositories/auth_repository.dart';
 import 'package:app_fitness/presentation/pages/home_page.dart';

@@ -1,5 +1,5 @@
 import 'package:appwrite/appwrite.dart';
-import 'package:appwrite/models.dart' as AppwriteModels; // Para el tipo User
+import 'package:appwrite/models.dart' as AppwriteModels;
 
 class AuthRepository {
   final Account _account;
@@ -72,34 +72,26 @@ class AuthRepository {
     }
   }
 
-  /// Obtiene el usuario actualmente autenticado.
-  /// Devuelve el objeto User si hay una sesión activa, o null si no la hay o si ocurre un error.
   Future<AppwriteModels.User?> getCurrentUser() async {
     try {
-      // _account.get() devuelve el usuario actual si la sesión es válida.
-      // Lanza una AppwriteException si no hay sesión o si la sesión es inválida.
       return await _account.get();
     } on AppwriteException catch (e) {
-      // Es normal que esto falle si no hay usuario logueado (ej. la primera vez que abre la app)
-      // No necesariamente es un "error" que mostrar al usuario, a menos que esperemos que esté logueado.
       print(
         "AppwriteException en getCurrentUser (puede ser normal si no hay sesión): ${e.message}",
       );
       return null;
     } catch (e) {
       print('Error inesperado en getCurrentUser: $e');
-      // En caso de un error completamente inesperado, también devolvemos null.
+
       return null;
     }
   }
 
-  /// Verifica si hay una sesión de usuario activa.
   Future<bool> isLoggedIn() async {
     try {
-      await _account.get(); // Intenta obtener el usuario
-      return true; // Si no hay excepción, el usuario está logueado
+      await _account.get();
+      return true;
     } catch (_) {
-      // Cualquier excepción (AppwriteException por no sesión, u otra) significa que no está logueado.
       return false;
     }
   }

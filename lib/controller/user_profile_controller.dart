@@ -1,4 +1,3 @@
-// lib/controller/user_profile_controller.dart
 import 'package:app_fitness/model/user_profile_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -36,17 +35,12 @@ class UserProfileController extends GetxController {
         print(
           "Perfil no encontrado para el usuario $userId. Puede ser la primera vez.",
         );
-        // Si es la primera vez y no hay perfil, creamos una instancia local
-        // SIN ID de Appwrite. El campo 'id' será null.
-        // Esto permite que ProfilePage muestre el nombre si viene de Auth,
-        // y que AuthController identifique que es un perfil "no guardado".
+
         userProfile.value = UserProfileModel(
           userId: userId,
           name: authUserName.isNotEmpty ? authUserName : "Usuario",
-          goal: '', // Dejar vacío para que el usuario lo llene
-          fitnessLevel: '', // Dejar vacío
-          // age y weight serán null por defecto
-          // id, createdAt, updatedAt también serán null
+          goal: '',
+          fitnessLevel: '',
         );
       } else {
         // Si el perfil existe pero el nombre está vacío (caso raro), actualízalo con el de Auth si está disponible

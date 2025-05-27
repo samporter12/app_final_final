@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 class WorkoutDayPanel extends StatelessWidget {
   final WorkoutDayModel workoutDay;
-  final int dayIndex; // Para saber qué día es (ej. Día 1, Día 2)
+  final int dayIndex;
 
   const WorkoutDayPanel({
     super.key,
@@ -20,9 +20,7 @@ class WorkoutDayPanel extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: ExpansionTile(
-        key: PageStorageKey<String>(
-          'workout_day_$dayIndex',
-        ), // Para mantener estado de expansión
+        key: PageStorageKey<String>('workout_day_$dayIndex'),
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primary,
           child: Text(

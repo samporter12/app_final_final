@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 
 class ExerciseCard extends StatelessWidget {
   final ExerciseModel exercise;
-  final VoidCallback? onToggleComplete; // Opcional: para marcar como completado
-  final bool isCompleted; // Opcional
+  final VoidCallback? onToggleComplete;
+  final bool isCompleted;
 
   const ExerciseCard({
     super.key,

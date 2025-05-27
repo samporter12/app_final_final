@@ -27,35 +27,25 @@ class FitnessAiService {
     print("FitnessAiService inicializado correctamente.");
   }
 
-  // Getter para verificar si el servicio está listo para usarse.
   bool get isInitialized => _isInitialized;
 
   String _cleanGeminiResponse(String rawResponse, {bool expectObject = true}) {
     String cleaned = rawResponse.trim();
 
-    // Eliminar ```json al principio y ``` al final si existen
     if (cleaned.startsWith("```json\n")) {
-      cleaned = cleaned.substring(7); // Longitud de "```json\n"
+      cleaned = cleaned.substring(7);
       if (cleaned.endsWith("\n```")) {
-        cleaned = cleaned.substring(
-          0,
-          cleaned.length - 4,
-        ); // Longitud de "\n```"
+        cleaned = cleaned.substring(0, cleaned.length - 4);
       } else if (cleaned.endsWith("```")) {
         cleaned = cleaned.substring(0, cleaned.length - 3);
       }
     } else if (cleaned.startsWith("```")) {
-      // Caso sin newline después de ```json
       cleaned = cleaned.substring(3);
       if (cleaned.endsWith("```")) {
         cleaned = cleaned.substring(0, cleaned.length - 3);
       }
     }
-
-    // Eliminar "json " (o similar) al principio si existe, después de los ```
-    // y buscar el primer '{' o '['
     if (cleaned.toLowerCase().startsWith("json")) {
-      // Encuentra el primer '{' o '[' después de la palabra "json"
       int objectIndex = cleaned.indexOf('{');
       int arrayIndex = cleaned.indexOf('[');
 
@@ -64,13 +54,9 @@ class FitnessAiService {
           cleaned = cleaned.substring(objectIndex);
         } else if (arrayIndex != -1 &&
             !cleaned.toLowerCase().startsWith("json {")) {
-          // A veces Gemini da un array cuando se espera un objeto, si el prompt no fue 100% estricto.
-          // O si la palabra "json" está seguida por un array.
-          // Esto es menos común si el prompt es claro.
           cleaned = cleaned.substring(arrayIndex);
         }
       } else {
-        // expectArray
         if (arrayIndex != -1) {
           cleaned = cleaned.substring(arrayIndex);
         } else if (objectIndex != -1 &&

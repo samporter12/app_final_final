@@ -1,13 +1,14 @@
-import 'package:app_fitness/controller/auth_controller.dart';
-import 'package:app_fitness/controller/user_profile_controller.dart';
 import 'package:app_fitness/core/service/fitness_ai_service.dart';
-import 'package:app_fitness/data/repositories/recipe_repository.dart';
 import 'package:app_fitness/model/recipe_model.dart';
 import 'package:app_fitness/model/user_profile_model.dart';
 import 'package:app_fitness/model/workout_routine_model.dart';
 import 'package:get/get.dart';
 import 'dart:convert';
 import 'package:app_fitness/data/repositories/workout_repository.dart';
+import 'package:app_fitness/data/repositories/recipe_repository.dart';
+import 'package:app_fitness/controller/user_profile_controller.dart';
+import 'package:app_fitness/controller/auth_controller.dart';
+import 'package:flutter/material.dart';
 
 class FitnessController extends GetxController {
   final FitnessAiService _aiService = Get.find<FitnessAiService>();
@@ -52,13 +53,47 @@ class FitnessController extends GetxController {
       return;
     }
 
-    if (profile == null || userId == null) {
+    if (profile == null ||
+        userId == null ||
+        profile.id == null ||
+        profile.id!.isEmpty) {
       fitnessError.value =
-          "Perfil de usuario no disponible. Por favor, completa tu perfil.";
+          "Perfil de usuario no disponible o incompleto. Por favor, completa tu perfil.";
       Get.snackbar(
         "Perfil Requerido",
         fitnessError.value,
         snackPosition: SnackPosition.BOTTOM,
+        mainButton: TextButton(
+          onPressed: () => Get.toNamed('/profile'),
+          child: const Text(
+            "Ir al Perfil",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+        backgroundColor: Colors.orangeAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    if (profile.name.isEmpty ||
+        profile.goal.isEmpty ||
+        profile.fitnessLevel.isEmpty) {
+      fitnessError.value =
+          "Faltan datos clave en tu perfil (nombre, objetivo o nivel). Por favor, actualiza tu perfil.";
+      Get.snackbar(
+        "Perfil Incompleto",
+        fitnessError.value,
+        snackPosition: SnackPosition.BOTTOM,
+        mainButton: TextButton(
+          onPressed: () => Get.toNamed('/profile'),
+          child: const Text(
+            "Actualizar Perfil",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+        backgroundColor: Colors.orangeAccent,
+        colorText: Colors.white,
       );
       return;
     }
@@ -69,7 +104,10 @@ class FitnessController extends GetxController {
       try {
         currentWorkoutRoutine.value = await _workoutRepository
             .getWorkoutRoutineForUser(userId);
-        if (currentWorkoutRoutine.value != null) routineLoadedFromRepo = true;
+        if (currentWorkoutRoutine.value != null) {
+          routineLoadedFromRepo = true;
+          print("Rutina cargada desde el repositorio para $userId.");
+        }
       } catch (e) {
         print("Error cargando rutina desde repo: $e");
       }
@@ -88,6 +126,7 @@ class FitnessController extends GetxController {
         if (recipes.isNotEmpty) {
           currentRecipes.assignAll(recipes);
           recipesLoadedFromRepo = true;
+          print("Recetas cargadas desde el repositorio para $userId.");
         }
       } catch (e) {
         print("Error cargando recetas desde repo: $e");
@@ -121,7 +160,7 @@ class FitnessController extends GetxController {
         "Error en Plan",
         fitnessError.value,
         snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 7),
       );
     }
   }
@@ -132,25 +171,30 @@ class FitnessController extends GetxController {
   ) async {
     isLoadingWorkout.value = true;
     String? previousError =
-        fitnessError.value.contains("rutina") ? null : fitnessError.value;
+        fitnessError.value.contains("rutina")
+            ? null
+            : (fitnessError.value.isEmpty ? null : fitnessError.value);
 
     try {
       final String routineJsonString = await _aiService.generateWorkoutRoutine(
+        userName: profile.name,
+        userAge: profile.age,
+        userWeight: profile.weight,
         userGoal: profile.goal,
         userFitnessLevel: profile.fitnessLevel,
       );
       final Map<String, dynamic> routineJson = jsonDecode(routineJsonString);
       final newRoutine = WorkoutRoutineModel.fromJson(routineJson);
-      newRoutine.userId = userId; // Asignar userId para referencia
-      newRoutine.createdAt = DateTime.now(); // Asignar fecha
+      newRoutine.userId = userId;
+      newRoutine.createdAt = DateTime.now();
       currentWorkoutRoutine.value = newRoutine;
 
       if (_workoutRepository != null) {
-        await _workoutRepository.saveWorkoutRoutine(
+        await _workoutRepository!.saveWorkoutRoutine(
           currentWorkoutRoutine.value!,
           userId,
         );
-        print("Rutina guardada en Appwrite.");
+        print("Rutina guardada en Appwrite para $userId.");
       }
       fitnessError.value = previousError ?? '';
     } catch (e) {
@@ -173,11 +217,17 @@ class FitnessController extends GetxController {
   ) async {
     isLoadingRecipes.value = true;
     String? previousError =
-        fitnessError.value.contains("recetas") ? null : fitnessError.value;
+        fitnessError.value.contains("recetas")
+            ? null
+            : (fitnessError.value.isEmpty ? null : fitnessError.value);
 
     try {
       final String recipesJsonString = await _aiService.generateRecipes(
+        userName: profile.name,
+        userAge: profile.age,
+        userWeight: profile.weight,
         userGoal: profile.goal,
+        userFitnessLevel: profile.fitnessLevel,
       );
       final Map<String, dynamic> recipesJson = jsonDecode(recipesJsonString);
       final recipeListModel = RecipeListModel.fromJson(recipesJson);
@@ -195,10 +245,9 @@ class FitnessController extends GetxController {
           currentRecipes.toList(),
           userId,
         );
-        print("Recetas guardadas en Appwrite.");
+        print("Recetas guardadas en Appwrite para $userId.");
       }
-      fitnessError.value =
-          previousError ?? ''; // Limpiar error de recetas si tuvo éxito
+      fitnessError.value = previousError ?? '';
     } catch (e) {
       print("Error en _generateAndSaveRecipes: $e");
       final recipeError =
@@ -219,5 +268,6 @@ class FitnessController extends GetxController {
     fitnessError.value = '';
     isLoadingWorkout.value = false;
     isLoadingRecipes.value = false;
+    print("Datos de FitnessController limpiados.");
   }
 }

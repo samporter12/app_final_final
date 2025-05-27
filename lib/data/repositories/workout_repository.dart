@@ -1,5 +1,4 @@
-// lib/data/repositories/workout_repository.dart
-import 'dart:convert'; // Necesario para jsonEncode y jsonDecode
+import 'dart:convert';
 import 'package:app_fitness/model/exercise_model.dart';
 import 'package:app_fitness/model/workout_routine_model.dart';
 import 'package:appwrite/appwrite.dart';
@@ -96,7 +95,7 @@ class WorkoutRepository {
           days: parsedDays,
         );
       }
-      return null; // No se encontró rutina
+      return null;
     } on AppwriteException catch (e) {
       print(
         "AppwriteException en getWorkoutRoutineForUser: ${e.message} (Code: ${e.code})",

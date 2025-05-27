@@ -1,19 +1,15 @@
-// lib/core/services/fitness_ai_service.dart
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Para cargar la API Key
-import 'package:google_generative_ai/google_generative_ai.dart'; // Paquete de Gemini
-import 'dart:convert'; // Para decodificar JSON (jsonDecode)
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:convert';
 
 class FitnessAiService {
-  GenerativeModel? _model; // El modelo de IA generativa de Gemini
-  bool _isInitialized =
-      false; // Bandera para saber si el servicio se inicializó correctamente
+  GenerativeModel? _model;
+  bool _isInitialized = false;
 
-  // Constructor: Llama a _initialize() para configurar el servicio.
   FitnessAiService() {
     _initialize();
   }
 
-  // Método privado para inicializar el modelo de Gemini.
   Future<void> _initialize() async {
     final apiKey = dotenv.env['GEMINI_API_KEY'];
 
@@ -22,7 +18,11 @@ class FitnessAiService {
       _isInitialized = false;
       return;
     }
-    _model = GenerativeModel(model: 'gemini-1.5-flash-latest', apiKey: apiKey);
+    _model = GenerativeModel(
+      model: 'gemini-1.5-flash-latest',
+      apiKey: apiKey,
+      generationConfig: GenerationConfig(temperature: 0.7),
+    );
     _isInitialized = true;
     print("FitnessAiService inicializado correctamente.");
   }
@@ -45,31 +45,20 @@ class FitnessAiService {
         cleaned = cleaned.substring(0, cleaned.length - 3);
       }
     }
-    if (cleaned.toLowerCase().startsWith("json")) {
-      int objectIndex = cleaned.indexOf('{');
-      int arrayIndex = cleaned.indexOf('[');
 
-      if (expectObject) {
-        if (objectIndex != -1) {
-          cleaned = cleaned.substring(objectIndex);
-        } else if (arrayIndex != -1 &&
-            !cleaned.toLowerCase().startsWith("json {")) {
-          cleaned = cleaned.substring(arrayIndex);
-        }
-      } else {
-        if (arrayIndex != -1) {
-          cleaned = cleaned.substring(arrayIndex);
-        } else if (objectIndex != -1 &&
-            !cleaned.toLowerCase().startsWith("json [")) {
-          cleaned = cleaned.substring(objectIndex);
-        }
+    if (cleaned.toLowerCase().startsWith("json")) {
+      int startIndex = cleaned.indexOf(expectObject ? '{' : '[');
+      if (startIndex != -1) {
+        cleaned = cleaned.substring(startIndex);
       }
     }
-
     return cleaned.trim();
   }
 
   Future<String> generateWorkoutRoutine({
+    required String userName,
+    int? userAge,
+    double? userWeight,
     required String userGoal,
     required String userFitnessLevel,
     List<String>? preferredMuscleGroups,
@@ -82,28 +71,46 @@ class FitnessAiService {
     }
 
     final prompt = """
-    Eres un entrenador personal experto. Genera una rutina de ejercicios detallada para un usuario con las siguientes características:
-    - Objetivo: $userGoal
-    - Nivel de Fitness: $userFitnessLevel
-    ${preferredMuscleGroups != null && preferredMuscleGroups.isNotEmpty ? "- Grupos musculares preferidos: ${preferredMuscleGroups.join(', ')}" : ""}
-    - Días de entrenamiento por semana: $daysPerWeek
+    Eres un entrenador personal experto y motivador llamado "FitMentor AI".
+    Genera una rutina de ejercicios altamente personalizada, detallada y motivadora para un usuario llamado $userName.
 
-    Para cada día de entrenamiento, especifica un nombre descriptivo (ej. 'Día 1: Pecho y Tríceps').
-    Para cada ejercicio, incluye:
-    - 'name': nombre del ejercicio (string)
-    - 'sets': número de series (integer)
-    - 'reps': rango de repeticiones (string, ej. "8-12" o "15")
-    - 'rest': tiempo de descanso en segundos después de todas las series de ese ejercicio (integer, ej. 60)
-    - 'notes': notas adicionales o consejos para el ejercicio (string, opcional, ej. "Mantén la espalda recta")
+    Considera los siguientes datos del usuario:
+    - Nombre: $userName
+    - Edad: ${userAge ?? "No especificada"} años
+    - Peso: ${userWeight ?? "No especificado"} kg
+    - Objetivo Principal: $userGoal (ej. "ganar masa muscular", "perder grasa y tonificar", "mejorar resistencia")
+    - Nivel de Fitness Actual: $userFitnessLevel (ej. "principiante con poca experiencia", "intermedio, entrena 3 veces/semana", "avanzado, más de 2 años entrenando")
+    ${preferredMuscleGroups != null && preferredMuscleGroups.isNotEmpty ? "- Grupos musculares a priorizar: ${preferredMuscleGroups.join(', ')}" : ""}
+    - Días disponibles para entrenar por semana: $daysPerWeek
 
+    El plan debe incluir:
+    1. Una breve introducción motivadora y personalizada para $userName, explicando el enfoque del plan.
+    2. Un desglose por cada día de entrenamiento. El nombre de cada día debe ser descriptivo y puede incluir el nombre del usuario (ej. 'Día 1: Empuje y Potencia para $userName').
+
+    Para cada ejercicio dentro de cada día, detalla:
+    - 'name': Nombre completo del ejercicio (string).
+    - 'sets': Número de series (integer).
+    - 'reps': Rango de repeticiones o tiempo (string, ej. "8-12", "15", "30 segundos").
+    - 'rest': Tiempo de descanso en segundos después de todas las series de ese ejercicio (integer, ej. 60, 90).
+    - 'notes': Consejos clave de técnica, forma, o alternativas si es un ejercicio complejo (string, opcional).
+
+    Estructura de la respuesta:
     Devuelve la respuesta EXCLUSIVAMENTE en formato JSON. El JSON debe tener una clave principal "workoutPlan" que sea un objeto.
-    Este objeto contendrá una clave "days" que será un array de objetos, donde cada objeto representa un día de entrenamiento.
-    Cada objeto de día debe tener una clave "dayName" (string) y una clave "exercises" que sea un array de objetos de ejercicio.
-    Asegúrate de que el JSON sea válido.
+    Este objeto "workoutPlan" debe contener:
+    - una clave "introduction" (string, el mensaje introductorio para $userName).
+    - una clave "days" que será un array de objetos, donde cada objeto representa un día de entrenamiento.
+    Cada objeto de día (dentro del array "days") debe tener:
+      - una clave "dayName" (string).
+      - una clave "exercises" que sea un array de objetos de ejercicio (con las claves 'name', 'sets', 'reps', 'rest', 'notes').
+
+    Asegúrate de que el JSON sea sintácticamente válido y completo según esta estructura.
+    Adapta la intensidad y complejidad de los ejercicios al nivel de fitness y objetivo de $userName.
     """;
 
     try {
-      print("Enviando prompt de rutina a Gemini...");
+      print(
+        "Enviando prompt de rutina personalizado a Gemini para $userName (Objetivo: $userGoal, Nivel: $userFitnessLevel)...",
+      );
       final content = [Content.text(prompt)];
       final response = await _model!.generateContent(content);
       final responseText = response.text?.trim();
@@ -111,13 +118,15 @@ class FitnessAiService {
       if (responseText == null || responseText.isEmpty) {
         throw Exception("Gemini no devolvió contenido para la rutina.");
       }
-      print("Respuesta cruda de Gemini (rutina): $responseText");
+      print("Respuesta cruda de Gemini (rutina para $userName): $responseText");
 
       String cleanedResponseText = _cleanGeminiResponse(
         responseText,
         expectObject: true,
       );
-      print("Respuesta de Gemini (limpia para rutina): $cleanedResponseText");
+      print(
+        "Respuesta de Gemini (limpia para rutina de $userName): $cleanedResponseText",
+      );
 
       try {
         jsonDecode(cleanedResponseText);
@@ -131,15 +140,21 @@ class FitnessAiService {
         );
       }
     } catch (e) {
-      print("Error al generar rutina con Gemini: $e");
-      throw Exception("Error al generar la rutina: ${e.toString()}");
+      print("Error al generar rutina con Gemini para $userName: $e");
+      throw Exception(
+        "Error al generar la rutina para $userName: ${e.toString()}",
+      );
     }
   }
 
   Future<String> generateRecipes({
+    required String userName,
+    int? userAge,
+    double? userWeight,
     required String userGoal,
+    String? userFitnessLevel,
     int numberOfRecipes = 3,
-    String? dietaryRestrictions,
+    List<String>? dietaryRestrictions,
     List<String>? preferredIngredients,
     List<String>? dislikedIngredients,
   }) async {
@@ -150,28 +165,40 @@ class FitnessAiService {
     }
 
     final prompt = """
-    Eres un nutricionista experto. Sugiere $numberOfRecipes recetas saludables (ej. desayuno, almuerzo, cena) para un usuario con el siguiente objetivo: $userGoal.
-    ${dietaryRestrictions != null && dietaryRestrictions.isNotEmpty ? "Considera estas restricciones alimentarias: $dietaryRestrictions." : ""}
-    ${preferredIngredients != null && preferredIngredients.isNotEmpty ? "Incluye si es posible estos ingredientes preferidos: ${preferredIngredients.join(', ')}." : ""}
-    ${dislikedIngredients != null && dislikedIngredients.isNotEmpty ? "Evita estos ingredientes no deseados: ${dislikedIngredients.join(', ')}." : ""}
+    Eres un nutricionista experto y creativo llamado "NutriFit AI".
+    Sugiere $numberOfRecipes recetas saludables, deliciosas y fáciles de preparar, específicamente diseñadas para un usuario llamado $userName.
 
-    Para cada receta, incluye:
-    - 'name': nombre de la receta (string)
-    - 'type': tipo de comida (string, ej. "Desayuno", "Almuerzo", "Cena", "Snack")
-    - 'description': una breve descripción de la receta (string, opcional)
-    - 'ingredients': lista de ingredientes con cantidades (array de strings, ej. ["1 pechuga de pollo (150g)", "1/2 taza de quinoa cocida"])
-    - 'preparation': instrucciones claras y concisas de preparación (string)
-    - 'calories': calorías aproximadas por porción (integer)
-    - 'protein': gramos de proteína aproximados por porción (integer)
-    - 'carbs': gramos de carbohidratos aproximados por porción (integer)
-    - 'fats': gramos de grasas aproximados por porción (integer)
+    Considera el siguiente perfil y preferencias del usuario:
+    - Nombre: $userName
+    - Edad: ${userAge ?? "No especificada"} años
+    - Peso: ${userWeight ?? "No especificado"} kg
+    - Objetivo Principal de Fitness: $userGoal
+    - Nivel de Fitness (puede influir en las necesidades calóricas y tipo de comidas): ${userFitnessLevel ?? "No especificado"}
+    ${dietaryRestrictions != null && dietaryRestrictions.isNotEmpty ? "- Restricciones Alimentarias Importantes: ${dietaryRestrictions.join(', ')}." : ""}
+    ${preferredIngredients != null && preferredIngredients.isNotEmpty ? "- Ingredientes que le gustan o quiere incluir: ${preferredIngredients.join(', ')}." : ""}
+    ${dislikedIngredients != null && dislikedIngredients.isNotEmpty ? "- Ingredientes que NO le gustan o quiere evitar: ${dislikedIngredients.join(', ')}." : ""}
 
+    Para cada una de las $numberOfRecipes recetas, proporciona la siguiente información:
+    - 'name': Nombre atractivo de la receta (string).
+    - 'type': Tipo de comida (string, ej. "Desayuno Energético", "Almuerzo Ligero", "Cena Reparadora", "Snack Proteico").
+    - 'description': Una breve descripción apetitosa y motivadora para $userName, explicando por qué es buena para su objetivo (string, opcional).
+    - 'ingredients': Lista detallada de ingredientes con cantidades precisas (array de strings, ej. ["150g de pechuga de pollo", "1/2 taza (cocida) de quinoa", "1 puñado de espinacas frescas"]).
+    - 'preparation': Instrucciones claras, paso a paso, y concisas para la preparación (string).
+    - 'calories': Calorías aproximadas por porción (integer).
+    - 'protein': Gramos de proteína aproximados por porción (integer).
+    - 'carbs': Gramos de carbohidratos aproximados por porción (integer).
+    - 'fats': Gramos de grasas aproximados por porción (integer).
+
+    Estructura de la respuesta:
     Devuelve la respuesta EXCLUSIVAMENTE en formato JSON. El JSON debe ser un objeto con una clave principal "recipes" que sea un array de objetos de receta.
-    Asegúrate de que el JSON sea válido.
+    Asegúrate de que el JSON sea sintácticamente válido y completo según esta estructura.
+    Prioriza la variedad, el sabor, la facilidad de preparación, y el cumplimiento del objetivo y las preferencias de $userName.
     """;
 
     try {
-      print("Enviando prompt de recetas a Gemini...");
+      print(
+        "Enviando prompt de recetas personalizado a Gemini para $userName (Objetivo: $userGoal)...",
+      );
       final content = [Content.text(prompt)];
       final response = await _model!.generateContent(content);
       final responseText = response.text?.trim();
@@ -179,14 +206,17 @@ class FitnessAiService {
       if (responseText == null || responseText.isEmpty) {
         throw Exception("Gemini no devolvió contenido para las recetas.");
       }
-      print("Respuesta cruda de Gemini (recetas): $responseText");
+      print(
+        "Respuesta cruda de Gemini (recetas para $userName): $responseText",
+      );
 
-      // Para recetas, esperamos un objeto que contiene un array: {"recipes": [...]}
       String cleanedResponseText = _cleanGeminiResponse(
         responseText,
         expectObject: true,
       );
-      print("Respuesta de Gemini (limpia para recetas): $cleanedResponseText");
+      print(
+        "Respuesta de Gemini (limpia para recetas de $userName): $cleanedResponseText",
+      );
 
       try {
         jsonDecode(cleanedResponseText);
@@ -200,8 +230,10 @@ class FitnessAiService {
         );
       }
     } catch (e) {
-      print("Error al generar recetas con Gemini: $e");
-      throw Exception("Error al generar las recetas: ${e.toString()}");
+      print("Error al generar recetas con Gemini para $userName: $e");
+      throw Exception(
+        "Error al generar las recetas para $userName: ${e.toString()}",
+      );
     }
   }
 }

@@ -214,7 +214,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(
                       RegExp(r'^\d*([.,])?\d{0,1}$'),
-                    ), // Permite números con un decimal
+                    ),
                   ],
                   validator: (value) {
                     if (value != null && value.trim().isNotEmpty) {
@@ -315,7 +315,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 10),
                 Obx(() {
-                  // Para mostrar errores del proceso de guardado
                   if (_profileController.profileError.value.isNotEmpty &&
                       !_profileController.isLoadingProfile.value) {
                     return Padding(

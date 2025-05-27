@@ -1,4 +1,4 @@
-import 'package:app_fitness/model/exercise_model.dart'; // Ajustado a tu estructura
+import 'package:app_fitness/model/exercise_model.dart';
 
 class WorkoutRoutineModel {
   final List<WorkoutDayModel> days;
@@ -24,11 +24,10 @@ class WorkoutRoutineModel {
                 .toList();
         return WorkoutRoutineModel(
           days: parsedDays,
-          id: json['\$id'] as String?, // Si cargas desde Appwrite
-          userId: json['userId'] as String?, // Si cargas desde Appwrite
+          id: json['\$id'] as String?,
+          userId: json['userId'] as String?,
           createdAt:
-              json['\$createdAt'] !=
-                      null // O el nombre de tu campo de fecha
+              json['\$createdAt'] != null
                   ? DateTime.tryParse(json['\$createdAt'])
                   : null,
         );

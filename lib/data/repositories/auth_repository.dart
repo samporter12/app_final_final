@@ -4,7 +4,7 @@ import 'package:appwrite/models.dart' as AppwriteModels;
 class AuthRepository {
   final Account _account;
 
-  AuthRepository(this._account); // Constructor que recibe Account
+  AuthRepository(this._account);
 
   Future<AppwriteModels.User> createAccount({
     required String email,
@@ -22,7 +22,6 @@ class AuthRepository {
     } on AppwriteException catch (e) {
       throw Exception(e.message ?? 'Error desconocido al registrar');
     } catch (e) {
-      // Considera registrar este error con un servicio de logging más robusto
       print('Error inesperado en createAccount: $e');
       throw Exception(
         'Error inesperado al registrar. Por favor, inténtalo de nuevo.',
@@ -41,9 +40,7 @@ class AuthRepository {
       );
       return session;
     } on AppwriteException catch (e) {
-      // Personaliza mensajes de error comunes
       if (e.code == 401) {
-        // Código común para credenciales inválidas
         throw Exception('Email o contraseña incorrectos.');
       } else if (e.code == 400 &&
           e.message != null &&

@@ -1,14 +1,18 @@
-// lib/presentation/pages/home_page.dart
+import 'package:app_fitness/model/exercise_model.dart';
 import 'package:app_fitness/model/recipe_model.dart';
 import 'package:app_fitness/model/workout_routine_model.dart';
+import 'package:app_fitness/presentation/widgets/loading_indicator.dart';
+import 'package:app_fitness/presentation/widgets/recipe_card.dart';
+import 'package:app_fitness/presentation/widgets/section_title.dart';
+import 'package:app_fitness/presentation/widgets/workout_day_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:app_fitness/controller/auth_controller.dart'; // Ajustado
-import 'package:app_fitness/controller/user_profile_controller.dart'; // Ajustado
-import 'package:app_fitness/controller/fitness_controller.dart'; // Nuevo
+import 'package:app_fitness/controller/auth_controller.dart';
+import 'package:app_fitness/controller/user_profile_controller.dart';
+import 'package:app_fitness/controller/fitness_controller.dart';
 
 class HomePage extends StatefulWidget {
-  HomePage({super.key});
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -17,47 +21,67 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final AuthController _authController = Get.find();
   final UserProfileController _userProfileController = Get.find();
-  final FitnessController _fitnessController = Get.find(); // Nuevo
+  final FitnessController _fitnessController = Get.find();
 
   @override
   void initState() {
     super.initState();
-    // Cargar perfil si no está cargado y luego generar plan
-    // Esto asegura que tenemos el perfil antes de pedir el plan
     _loadProfileAndFitnessPlan();
   }
 
   Future<void> _loadProfileAndFitnessPlan() async {
-    // Asegurarse de que el perfil del usuario esté cargado
-    if (_userProfileController.userProfile.value == null) {
+    if (_authController.currentUser.value == null) {
+      print(
+        "HomePage: No hay usuario autenticado, no se cargará ni generará plan.",
+      );
+      return;
+    }
+    if (_userProfileController.userProfile.value == null ||
+        _userProfileController.userProfile.value!.id == null ||
+        _userProfileController.userProfile.value!.id!.isEmpty) {
+      print("HomePage: Perfil no cargado o incompleto, intentando cargar...");
       await _userProfileController.loadUserProfile();
     }
-    // Si después de cargar, el perfil sigue siendo null, no hacer nada más.
-    if (_userProfileController.userProfile.value == null) {
-      // Podrías mostrar un mensaje o redirigir si el perfil es esencial aquí
-      print("HomePage: Perfil no disponible para generar plan.");
+    if (_userProfileController.userProfile.value == null ||
+        _userProfileController.userProfile.value!.id == null ||
+        _userProfileController.userProfile.value!.id!.isEmpty) {
+      print(
+        "HomePage: Perfil no disponible o incompleto después de intentar cargar. El usuario debe completar el perfil.",
+      );
       if (mounted) {
         Get.snackbar(
-          "Error de Perfil",
-          "No se pudo cargar tu perfil. Intenta de nuevo o ve a la página de perfil.",
+          "Perfil Incompleto",
+          "Por favor, completa tu perfil para obtener un plan personalizado.",
           snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 4),
+          mainButton: TextButton(
+            onPressed: () => Get.toNamed('/profile'),
+            child: const Text(
+              "Ir al Perfil",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          backgroundColor: Colors.orangeAccent,
+          colorText: Colors.white,
         );
       }
       return;
     }
 
-    // Una vez que el perfil está disponible, generar el plan de fitness
-    // El método generateFullFitnessPlan ya maneja la carga desde el repo o la generación.
-    // El parámetro forceRegenerate puede ser false por defecto.
-    // Si quieres un botón para "regenerar", ese botón pasaría true.
+    print(
+      "HomePage: Perfil disponible y usuario autenticado. Procediendo a generar/cargar plan.",
+    );
     if (mounted) {
-      // Verificar si el widget sigue montado
       await _fitnessController.generateFullFitnessPlan(forceRegenerate: false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Obx(() {
@@ -66,28 +90,31 @@ class _HomePageState extends State<HomePage> {
             userName != null && userName.isNotEmpty
                 ? 'Hola, $userName'
                 : 'Mi Plan Fitness',
+            style: TextStyle(color: theme.colorScheme.onPrimary),
           );
         }),
+        backgroundColor: theme.colorScheme.primary,
+        iconTheme: IconThemeData(color: theme.colorScheme.onPrimary),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () {
-              Get.toNamed('/profile');
-            },
+            tooltip: "Mi Perfil",
+            onPressed: () => Get.toNamed('/profile'),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: "Regenerar plan",
+            tooltip: "Regenerar Plan",
             onPressed: () {
-              // Mostrar diálogo de confirmación antes de regenerar
               Get.defaultDialog(
                 title: "Regenerar Plan",
                 middleText:
-                    "¿Estás seguro de que quieres generar un nuevo plan de ejercicios y recetas? El plan actual (si existe en el servidor) no se borrará, pero se generará uno nuevo.",
+                    "¿Estás seguro de que quieres generar un nuevo plan de ejercicios y recetas? Esto podría tomar unos momentos.",
                 textConfirm: "Sí, Regenerar",
+                confirmTextColor: Colors.white,
+                buttonColor: theme.colorScheme.primary,
                 textCancel: "Cancelar",
                 onConfirm: () {
-                  Get.back(); // Cerrar diálogo
+                  Get.back();
                   _fitnessController.generateFullFitnessPlan(
                     forceRegenerate: true,
                   );
@@ -97,18 +124,17 @@ class _HomePageState extends State<HomePage> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: "Cerrar Sesión",
             onPressed: () {
               _authController.logout();
-              _fitnessController
-                  .clearFitnessDataOnLogout(); // Limpiar datos de fitness
+              // _fitnessController.clearFitnessDataOnLogout(); // AuthController ya llama a esto
             },
           ),
         ],
       ),
       body: Obx(() {
-        // Usar Obx para reaccionar a los cambios en FitnessController
-        // Mostrar errores globales del FitnessController
         if (_fitnessController.fitnessError.value.isNotEmpty) {
+          // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -127,13 +153,13 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
+                    // Podrías reemplazarlo con tu StyledButton
                     icon: const Icon(Icons.refresh),
                     label: const Text("Intentar de Nuevo"),
-                    onPressed: () {
-                      _fitnessController.generateFullFitnessPlan(
-                        forceRegenerate: true,
-                      );
-                    },
+                    onPressed:
+                        () => _fitnessController.generateFullFitnessPlan(
+                          forceRegenerate: true,
+                        ),
                   ),
                 ],
               ),
@@ -141,31 +167,21 @@ class _HomePageState extends State<HomePage> {
           );
         }
 
-        // Mostrar indicadores de carga
-        bool isLoading =
+        bool isLoadingOverall =
             _fitnessController.isLoadingWorkout.value ||
             _fitnessController.isLoadingRecipes.value;
-        if (isLoading &&
+        bool noDataAvailable =
             _fitnessController.currentWorkoutRoutine.value == null &&
-            _fitnessController.currentRecipes.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 20),
-                Text(
-                  "Generando tu plan personalizado...",
-                  style: TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
+            _fitnessController.currentRecipes.isEmpty;
+
+        if (isLoadingOverall && noDataAvailable) {
+          return const LoadingIndicator(
+            message: "Generando tu plan personalizado...",
           );
         }
 
-        // Si no hay datos y no hay error (podría ser el estado inicial antes de la primera generación)
-        if (_fitnessController.currentWorkoutRoutine.value == null &&
-            _fitnessController.currentRecipes.isEmpty) {
+        if (noDataAvailable && !isLoadingOverall) {
+          // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -173,31 +189,31 @@ class _HomePageState extends State<HomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    Icons.fitness_center,
+                    Icons.hourglass_empty,
                     size: 48,
                     color: Colors.grey,
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    "Aún no tienes un plan de fitness.",
+                    "Aún no tienes un plan.",
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    "Presiona el botón de actualizar en la barra superior para generar uno.",
+                    "Presiona el botón de refrescar para generar uno.",
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
+                    // Podrías reemplazarlo con tu StyledButton
                     icon: const Icon(Icons.play_arrow),
                     label: const Text("Generar mi Plan Ahora"),
-                    onPressed: () {
-                      _fitnessController.generateFullFitnessPlan(
-                        forceRegenerate: true,
-                      );
-                    },
+                    onPressed:
+                        () => _fitnessController.generateFullFitnessPlan(
+                          forceRegenerate: true,
+                        ),
                   ),
                 ],
               ),
@@ -205,16 +221,24 @@ class _HomePageState extends State<HomePage> {
           );
         }
 
-        // Mostrar el plan de fitness y recetas
         return DefaultTabController(
-          length: 2, // Pestaña para Rutina y Pestaña para Recetas
+          length: 2,
           child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start, // Para alinear el SectionTitle
             children: [
-              const TabBar(
-                tabs: [
-                  Tab(icon: Icon(Icons.fitness_center), text: "Rutina"),
-                  Tab(icon: Icon(Icons.restaurant_menu), text: "Recetas"),
-                ],
+              Container(
+                color: theme.colorScheme.surfaceVariant,
+                child: TabBar(
+                  labelColor: theme.colorScheme.primary,
+                  unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                  indicatorColor: theme.colorScheme.primary,
+                  indicatorWeight: 3.0,
+                  tabs: const [
+                    Tab(icon: Icon(Icons.fitness_center), text: "Mi Rutina"),
+                    Tab(icon: Icon(Icons.restaurant_menu), text: "Mis Recetas"),
+                  ],
+                ),
               ),
               Expanded(
                 child: TabBarView(
@@ -239,129 +263,63 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildWorkoutTab(WorkoutRoutineModel? routine, bool isLoading) {
     if (isLoading && routine == null) {
-      // Cargando por primera vez la rutina
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 10),
-            Text("Cargando rutina..."),
-          ],
-        ),
-      );
+      return const LoadingIndicator(message: "Cargando rutina...");
     }
     if (routine == null || routine.days.isEmpty) {
+      // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
       return const Center(
-        child: Text(
-          "No se encontró una rutina de ejercicios. Intenta regenerar.",
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text(
+            "No se encontró una rutina de ejercicios.\nIntenta regenerar tu plan usando el botón de refrescar.",
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
-    return ListView.builder(
+    return ListView(
+      // Cambiado a ListView para poder añadir el SectionTitle
       padding: const EdgeInsets.all(8.0),
-      itemCount: routine.days.length,
-      itemBuilder: (context, index) {
-        final day = routine.days[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8.0),
-          child: ExpansionTile(
-            title: Text(
-              day.dayName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            children:
-                day.exercises.map((exercise) {
-                  return ListTile(
-                    title: Text(
-                      exercise.name,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: Text(
-                      "Series: ${exercise.sets}, Reps: ${exercise.reps}, Descanso: ${exercise.rest}s\n${exercise.notes != null && exercise.notes!.isNotEmpty ? 'Notas: ${exercise.notes}' : ''}",
-                    ),
-                    isThreeLine:
-                        exercise.notes != null && exercise.notes!.isNotEmpty,
-                  );
-                }).toList(),
-          ),
-        );
-      },
+      children: [
+        const SectionTitle(title: "Tu Plan Semanal"),
+        ...routine.days.asMap().entries.map((entry) {
+          // Usar asMap para obtener el índice
+          int dayIndex = entry.key;
+          WorkoutDayModel day = entry.value;
+          return WorkoutDayPanel(workoutDay: day, dayIndex: dayIndex);
+        }).toList(),
+      ],
     );
   }
 
   Widget _buildRecipesTab(List<RecipeModel> recipes, bool isLoading) {
     if (isLoading && recipes.isEmpty) {
-      // Cargando por primera vez las recetas
+      return const LoadingIndicator(message: "Cargando recetas...");
+    }
+    if (recipes.isEmpty) {
+      // Aquí podrías usar tu EmptyStateWidget si lo incluyeras en el futuro
       return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 10),
-            Text("Cargando recetas..."),
-          ],
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text(
+            "No se encontraron recetas.\nIntenta regenerar tu plan usando el botón de refrescar.",
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
-    if (recipes.isEmpty) {
-      return const Center(
-        child: Text("No se encontraron recetas. Intenta regenerar."),
-      );
-    }
-    return ListView.builder(
+    return ListView(
+      // Cambiado a ListView para poder añadir el SectionTitle
       padding: const EdgeInsets.all(8.0),
-      itemCount: recipes.length,
-      itemBuilder: (context, index) {
-        final recipe = recipes[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8.0),
-          child: ExpansionTile(
-            title: Text(
-              recipe.name,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            subtitle: Text(
-              recipe.type +
-                  (recipe.calories != null ? " - ${recipe.calories} kcal" : ""),
-            ),
-            childrenPadding: const EdgeInsets.all(16.0),
-            children: [
-              if (recipe.description != null && recipe.description!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text(
-                    recipe.description!,
-                    style: const TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                ),
-              Text(
-                "Ingredientes:",
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...recipe.ingredients.map((ing) => Text("- $ing")).toList(),
-              const SizedBox(height: 8),
-              Text(
-                "Preparación:",
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(recipe.preparation),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  if (recipe.protein != null)
-                    Chip(label: Text("Prot: ${recipe.protein}g")),
-                  if (recipe.carbs != null)
-                    Chip(label: Text("Carbs: ${recipe.carbs}g")),
-                  if (recipe.fats != null)
-                    Chip(label: Text("Grasas: ${recipe.fats}g")),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      children: [
+        const SectionTitle(title: "Sugerencias de Comidas"),
+        ...recipes.asMap().entries.map((entry) {
+          // Usar asMap para obtener el índice
+          int recipeIndex = entry.key;
+          RecipeModel recipe = entry.value;
+          return RecipeCard(recipe: recipe, recipeIndex: recipeIndex);
+        }).toList(),
+      ],
     );
   }
 }
